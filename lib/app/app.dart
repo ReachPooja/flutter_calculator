@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_calculator/home/views/home_view.dart';
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text('Material App Bar'),
-        ),
-        body: Center(
-          child: Container(
-            child: Text('Hello World'),
-          ),
-        ),
-      ),
+    return const MaterialApp(
+      home: HomeView(),
     );
   }
 }
