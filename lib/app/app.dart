@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_calculator/home/bloc/calculator_bloc.dart';
 import 'package:flutter_calculator/home/views/home_view.dart';
 
 class MyApp extends StatelessWidget {
@@ -6,8 +8,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: HomeView(),
+    return BlocProvider(
+      create: (context) => CalculatorBloc(),
+      child: const MaterialApp(
+        home: HomeView(),
+      ),
     );
   }
 }
