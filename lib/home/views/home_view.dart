@@ -1,9 +1,8 @@
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_calculator/home/bloc/calculator_bloc.dart';
 import 'package:flutter_calculator/home/views/widgets/primary_button.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class HomeView extends StatefulWidget {
@@ -17,7 +16,7 @@ class _HomeViewState extends State<HomeView> {
   late TextEditingController _controller;
   late FocusNode _focusNode;
 
-  static const Color primaryColor = Colors.purple;
+  static const Color primaryColor = Color(0xff9163cb);
   bool isLongPressed = false;
 
   @override
@@ -25,7 +24,6 @@ class _HomeViewState extends State<HomeView> {
     super.initState();
     _controller = TextEditingController();
     _focusNode = FocusNode();
-    print(_controller.selection.baseOffset);
   }
 
   @override
@@ -37,17 +35,37 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    log(_controller.selection.baseOffset.toString(), name: 'off');
-    return BlocListener<CalculatorBloc, CalculatorState>(
-      listener: (context, state) {
-        _controller
-          ..text = state.value
-          ..selection = TextSelection.fromPosition(
-            TextPosition(
-              offset: state.index,
-            ),
-          );
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<CalculatorBloc, CalculatorState>(
+          listener: (context, state) {
+            _controller.text = state.value;
+            if (state.index > 0 && state.index < _controller.text.length) {
+              _controller.selection = TextSelection.fromPosition(
+                TextPosition(
+                  offset: state.index,
+                ),
+              );
+            } else {
+              final newIndex = state.value.length;
+              _controller.selection = TextSelection.fromPosition(
+                TextPosition(
+                  offset: newIndex,
+                ),
+              );
+            }
+          },
+        ),
+        BlocListener<CalculatorBloc, CalculatorState>(
+          listenWhen: (previous, current) =>
+              previous.isLimitExceed != current.isLimitExceed,
+          listener: (context, state) {
+            if (state.isLimitExceed) {
+              Fluttertoast.showToast(msg: "Can't enter more than 15 digits");
+            }
+          },
+        ),
+      ],
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Calculate'),
@@ -56,78 +74,71 @@ class _HomeViewState extends State<HomeView> {
         body: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Expanded(
-              child: Center(
-                child: TextField(
-                  focusNode: _focusNode,
-                  onTap: () {
-                    if (_controller.text.isNotEmpty) {
-                      context.read<CalculatorBloc>().add(
-                            TextIndexChanged(
-                              _controller.selection.baseOffset,
-                            ),
-                          );
-                    }
-                  },
-                  cursorColor: primaryColor,
-                  textAlign: TextAlign.end,
-                  controller: _controller,
-                  maxLines: 4,
-                  style: const TextStyle(
-                    fontSize: 30,
-                  ),
-                  keyboardType: TextInputType.none,
-                  decoration: const InputDecoration(
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 16,
+            if (!context.watch<CalculatorBloc>().state.isFinalResult)
+              Expanded(
+                child: Center(
+                  child: TextField(
+                    focusNode: _focusNode,
+                    onTap: () {
+                      if (_controller.text.isNotEmpty) {
+                        context.read<CalculatorBloc>().add(
+                              TextIndexChanged(
+                                _controller.selection.baseOffset,
+                              ),
+                            );
+                      }
+                    },
+                    cursorColor: primaryColor,
+                    textAlign: TextAlign.end,
+                    controller: _controller,
+                    maxLines: 4,
+                    style: const TextStyle(
+                      fontSize: 30,
                     ),
-                    counterText: '',
-                    hintText: '0',
-                    border: InputBorder.none,
+                    keyboardType: TextInputType.none,
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
+                      counterText: '',
+                      hintText: '0',
+                      border: InputBorder.none,
+                    ),
                   ),
                 ),
               ),
-            ),
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    if (_controller.text.isNotEmpty) {
-                      context.read<CalculatorBloc>().add(
-                            ValueRemoved(),
-                          );
-                    }
-                  },
-                  onLongPressEnd: (_) {
-                    setState(() {
-                      isLongPressed = false;
-                    });
-                  },
-                  onLongPressStart: (_) async {
-                    setState(() {
-                      isLongPressed = true;
-                    });
-                    final value = _controller.text.length;
-                    if (_controller.text.isNotEmpty) {
-                      for (var i = 0; i < value; i++) {
-                        if (isLongPressed) {
-                          context.read<CalculatorBloc>().add(
-                                ValueRemoved(),
-                              );
-                          await Future<void>.delayed(
-                            const Duration(
-                              milliseconds: 50,
-                            ),
-                          );
-                        }
-                      }
-                    }
-                  },
-                  child: const Icon(
-                    PhosphorIcons.arrowLeftBold,
-                  ),
-                ),
-              ],
+            BlocBuilder<CalculatorBloc, CalculatorState>(
+              builder: (context, state) {
+                if (state.result.isEmpty) {
+                  return const SizedBox.shrink();
+                } else {
+                  return Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        const Icon(
+                          PhosphorIcons.equalsBold,
+                        ),
+                        const SizedBox(
+                          width: 16,
+                        ),
+                        Text(
+                          state.result,
+                          style: TextStyle(
+                            color: state.isFinalResult
+                                ? Colors.black
+                                : Colors.grey,
+                            fontSize: 30,
+                            fontWeight:
+                                state.isFinalResult ? FontWeight.w500 : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              },
             ),
             const Divider(
               height: 20,
@@ -136,28 +147,17 @@ class _HomeViewState extends State<HomeView> {
               children: [
                 TableRow(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                      ),
-                      child: IconButton(
-                        onPressed: () {
-                          context.read<CalculatorBloc>().add(
-                                AllCleared(),
-                              );
-                        },
-                        highlightColor: primaryColor.withOpacity(0.2),
-                        splashColor: primaryColor.withOpacity(0.2),
-                        icon: const Text(
-                          'AC',
-                          style: TextStyle(
-                            fontSize: 26,
-                            color: primaryColor,
-                          ),
-                        ),
-                      ),
+                    PrimaryButton(
+                      text: 'AC',
+                      iconColor: Colors.red,
+                      onPressed: () {
+                        context.read<CalculatorBloc>().add(
+                              AllCleared(),
+                            );
+                      },
                     ),
                     PrimaryButton(
+                      iconColor: primaryColor,
                       onPressed: () {
                         if (_controller.text.isNotEmpty) {
                           context.read<CalculatorBloc>().add(
@@ -165,29 +165,50 @@ class _HomeViewState extends State<HomeView> {
                               );
                         }
                       },
+                      onLongPressEnd: (_) {
+                        setState(() {
+                          isLongPressed = false;
+                        });
+                      },
+                      onLongPressStart: (_) async {
+                        setState(() {
+                          isLongPressed = true;
+                        });
+                        final value = _controller.text.length;
+                        if (_controller.text.isNotEmpty) {
+                          for (var i = 0; i < value; i++) {
+                            if (isLongPressed) {
+                              context.read<CalculatorBloc>().add(
+                                    ValueRemoved(),
+                                  );
+                              await Future<void>.delayed(
+                                const Duration(
+                                  milliseconds: 50,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
                       icon: PhosphorIcons.arrowLeftBold,
-                      color: primaryColor,
                     ),
                     PrimaryButton(
+                      iconColor: primaryColor,
                       onPressed: () {
                         context.read<CalculatorBloc>().add(
-                              const OperatorInserted(
-                                value: '(',
-                                isSpecialValue: true,
-                              ),
+                              PlusMinusInserted(),
                             );
                       },
                       icon: PhosphorIcons.plusMinusBold,
-                      color: primaryColor,
                     ),
                     PrimaryButton(
+                      iconColor: primaryColor,
                       onPressed: () {
                         context.read<CalculatorBloc>().add(
                               const OperatorInserted(value: '÷'),
                             );
                       },
                       icon: PhosphorIcons.divideBold,
-                      color: primaryColor,
                     ),
                   ],
                 ),
@@ -218,13 +239,13 @@ class _HomeViewState extends State<HomeView> {
                       icon: PhosphorIcons.numberNineBold,
                     ),
                     PrimaryButton(
+                      iconColor: primaryColor,
                       onPressed: () {
                         context.read<CalculatorBloc>().add(
                               const OperatorInserted(value: '×'),
                             );
                       },
                       icon: PhosphorIcons.xBold,
-                      color: primaryColor,
                     ),
                   ],
                 ),
@@ -255,13 +276,13 @@ class _HomeViewState extends State<HomeView> {
                       icon: PhosphorIcons.numberSixBold,
                     ),
                     PrimaryButton(
+                      iconColor: primaryColor,
                       onPressed: () {
                         context.read<CalculatorBloc>().add(
                               const OperatorInserted(value: '-'),
                             );
                       },
                       icon: PhosphorIcons.minusBold,
-                      color: primaryColor,
                     ),
                   ],
                 ),
@@ -292,19 +313,20 @@ class _HomeViewState extends State<HomeView> {
                       icon: PhosphorIcons.numberThreeBold,
                     ),
                     PrimaryButton(
+                      iconColor: primaryColor,
                       onPressed: () {
                         context.read<CalculatorBloc>().add(
                               const OperatorInserted(value: '+'),
                             );
                       },
                       icon: PhosphorIcons.plusBold,
-                      color: primaryColor,
                     ),
                   ],
                 ),
                 TableRow(
                   children: [
                     PrimaryButton(
+                      iconColor: primaryColor,
                       onPressed: () {
                         context.read<CalculatorBloc>().add(
                               const OperatorInserted(value: '%'),
@@ -328,19 +350,15 @@ class _HomeViewState extends State<HomeView> {
                       },
                       icon: PhosphorIcons.wifiNoneBold,
                     ),
-                    Container(
-                      height: 70,
-                      margin: const EdgeInsets.only(top: 4),
-                      padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.purple,
-                      ),
-                      child: const Icon(
-                        PhosphorIcons.equalsBold,
-                        color: Colors.white,
-                        size: 26,
-                      ),
+                    PrimaryButton(
+                      onPressed: () {
+                        context.read<CalculatorBloc>().add(
+                              ExpressionCalculated(),
+                            );
+                      },
+                      icon: PhosphorIcons.equalsBold,
+                      color: primaryColor,
+                      iconColor: Colors.white,
                     ),
                   ],
                 ),
